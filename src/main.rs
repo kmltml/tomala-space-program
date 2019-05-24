@@ -7,6 +7,7 @@ mod solver;
 use solver::State;
 
 use std::path::Path;
+use std::collections::vec_deque::VecDeque;
 
 use na::{Vector3, Point3};
 use kiss3d::window::Window;
@@ -50,11 +51,31 @@ fn main() {
 
     let mut gui_state = GuiState::new();
 
+    let trail_colors: [Point3<f32>; 3] = [
+        Point3::new(0.92, 0.80, 0.49),
+        Point3::new(0.49, 0.72, 0.92),
+        Point3::new(0.94, 0.94, 0.94)
+    ];
+    let mut trails: [VecDeque<Point3<f32>>; 3] = [VecDeque::new(), VecDeque::new(), VecDeque::new()];
+
+    const TRAIL_LENGTH: usize = 500;
+
     while window.render() {
         sol.set_local_translation(state.x[0].map(|x| x as f32).into());
         earth.set_local_translation(state.x[1].map(|x| x as f32).into());
         luna.set_local_translation(state.x[2].map(|x| x as f32).into());
         window.set_light(Light::Absolute(state.x[0].map(|x| x as f32).into()));
+        for i in 0..3 {
+            trails[i].push_back(state.x[i].map(|x| x as f32).into());
+            if(trails[i].len() > TRAIL_LENGTH) {
+                trails[i].pop_front();
+            }
+            let color = trail_colors[i];
+            for (i, (a, b)) in trails[i].iter().zip(trails[i].iter().skip(1)).enumerate() {
+                let l = (i as f32) / (TRAIL_LENGTH as f32);
+                window.draw_line(a, b, &(color * l));
+            }
+        }
         if !gui_state.paused {
             state.step(0.001, &masses);
         }
@@ -70,6 +91,7 @@ widget_ids! {
         momentum,
         energy,
         pause_play_button,
+        momentum_zero,
         body_panel[],
         mass[],
         velocity[]
@@ -169,6 +191,23 @@ fn gui(
         {
             state.paused = !state.paused;
         }
+
+        if widget::Button::new()
+            .parent(area.id)
+            .h(30.0)
+            .w(area.width / 3.0)
+            .right(0.0)
+            .y_relative(0.0)
+            .label("p 0")
+            .set(ids.momentum_zero, ui)
+            .was_clicked()
+        {
+            let m: f64 = masses.iter().sum();
+            let dv = momentum / m;
+            for i in 0..3 {
+                body_state.v[i] -= dv;
+            }
+        }
     }
 
     let prev = match gen {
@@ -217,7 +256,7 @@ fn body_panel(
             *mass = m;
         }
         let v = body_state.v[i].norm();
-        for nv in widget::NumberDialer::new(v, 0.0, 9999.0, 1)
+        for nv in widget::NumberDialer::new(v, 1.0, 9999.0, 1)
             .parent(area.id)
             .label("velocity")
             .border(0.0)
@@ -227,7 +266,7 @@ fn body_panel(
             .label_font_size(12)
             .set(ids.velocity[i], ui)
         {
-            body_state.v[i] *= nv / v;
+            body_state.v[i] = body_state.v[i].normalize() * nv;
         }
     }
     match a {
