@@ -38,6 +38,7 @@ fn main() {
 
     let mut ids = Ids::new(window.conrod_ui_mut().widget_id_generator());
     ids.mass.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
+    ids.velocity.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
     ids.body_panel.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
     window.conrod_ui_mut().theme = theme();
 
@@ -70,7 +71,8 @@ widget_ids! {
         energy,
         pause_play_button,
         body_panel[],
-        mass[]
+        mass[],
+        velocity[]
     }
 }
 
@@ -173,15 +175,16 @@ fn gui(
         Some(area) => area.id,
         None => ids.general
     };
-    let prev = body_panel(0, "Sol", &mut masses[0], state, prev, ui, ids);
-    let prev = body_panel(1, "Earth", &mut masses[1], state, prev, ui, ids);
-    let prev = body_panel(2, "Luna", &mut masses[2], state, prev, ui, ids);
+    let prev = body_panel(0, "Sol", &mut masses[0], body_state, state, prev, ui, ids);
+    let prev = body_panel(1, "Earth", &mut masses[1], body_state, state, prev, ui, ids);
+    let prev = body_panel(2, "Luna", &mut masses[2], body_state, state, prev, ui, ids);
 }
 
 fn body_panel(
     i: usize,
     title: &'static str,
     mass: &mut f64,
+    body_state: &mut State,
     state: &mut GuiState,
     previous: conrod::widget::Id,
     ui: &mut conrod::UiCell,
@@ -199,7 +202,7 @@ fn body_panel(
     for area in a {
         let canvas = widget::Canvas::new()
             .pad(10.0)
-            .h(30.0);
+            .h(60.0);
         area.set(canvas, ui);
         for m in widget::NumberDialer::new(*mass, 0.0, 9999.0, 1)
             .parent(area.id)
@@ -212,6 +215,19 @@ fn body_panel(
             .set(ids.mass[i], ui)
         {
             *mass = m;
+        }
+        let v = body_state.v[i].norm();
+        for nv in widget::NumberDialer::new(v, 0.0, 9999.0, 1)
+            .parent(area.id)
+            .label("velocity")
+            .border(0.0)
+            .align_left()
+            .down(0.0)
+            .h(30.0)
+            .label_font_size(12)
+            .set(ids.velocity[i], ui)
+        {
+            body_state.v[i] *= nv / v;
         }
     }
     match a {
