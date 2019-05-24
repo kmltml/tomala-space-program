@@ -14,7 +14,7 @@ fn get_acceleration(s: State, m: &[f64; 3]) -> [Vector3<f64>; 3] {
             if i != j {
                 let r = s.x[j] - s.x[i];
                 let rl = r.norm();
-                ret[i] += r * m[j] / rl * rl * rl;
+                ret[i] += r * m[j] / (rl * rl * rl);
             }
         }
     }

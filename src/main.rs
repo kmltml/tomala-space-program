@@ -44,10 +44,12 @@ fn main() {
     window.conrod_ui_mut().theme = theme();
 
     let mut state = State {
-        x: [Vector3::new(0.0, 0.0, 0.0), Vector3::new(8.0, 0.0, 0.0), Vector3::new(8.0, 0.0, 1.0)],
-        v: [Vector3::new(0.0, 0.0, -5.0), Vector3::new(0.0, 0.0, 50.0), Vector3::new(0.0, 10.0, 50.0)],
+        x: [Vector3::new(0.0, 0.0, 0.0), Vector3::new(20.0, 0.0, 0.0), Vector3::new(20.0, 0.0, 1.0)],
+        v: [Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 7.07),
+            Vector3::new(1.0, 0.0, 7.07)],
     };
-    let mut masses = [10.0, 1.0, 0.001];
+    let mut masses = [1000.0, 1.0, 0.001];
 
     let mut gui_state = GuiState::new();
 
@@ -77,7 +79,7 @@ fn main() {
             }
         }
         if !gui_state.paused {
-            state.step(0.001, &masses);
+            state.step(0.01, &masses);
         }
         gui(&mut window.conrod_ui_mut().set_widgets(), &ids, &mut masses, &mut gui_state, &mut state);
     }
