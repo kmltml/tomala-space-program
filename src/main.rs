@@ -55,21 +55,19 @@ fn main() {
     ];
     let mut trails: [VecDeque<Point3<f32>>; 3] = [VecDeque::new(), VecDeque::new(), VecDeque::new()];
 
-    const TRAIL_LENGTH: usize = 500;
-
     while window.render() {
         sol.set_local_translation(state.x[0].map(|x| x as f32).into());
         earth.set_local_translation(state.x[1].map(|x| x as f32).into());
         luna.set_local_translation(state.x[2].map(|x| x as f32).into());
         window.set_light(Light::Absolute(state.x[0].map(|x| x as f32).into()));
         for i in 0..3 {
-            trails[i].push_back(state.x[i].map(|x| x as f32).into());
-            if(trails[i].len() > TRAIL_LENGTH) {
-                trails[i].pop_front();
+            trails[i].push_front(state.x[i].map(|x| x as f32).into());
+            if(trails[i].len() > gui_state.trail_length) {
+                trails[i].pop_back();
             }
             let color = trail_colors[i];
             for (i, (a, b)) in trails[i].iter().zip(trails[i].iter().skip(1)).enumerate() {
-                let l = (i as f32) / (TRAIL_LENGTH as f32);
+                let l = 1.0 - (i as f32) / (gui_state.trail_length as f32);
                 window.draw_line(a, b, &(color * l));
             }
         }
@@ -94,21 +92,20 @@ fn init_state() -> State {
             Vector3::new(20.0, 0.0, 1.0)],
         v: [Vector3::new(0.0, 0.0, 0.0),
             Vector3::new(0.0, 0.0, 7.07),
-            Vector3::new(1.0, 0.0, 7.07)],
+            Vector3::new(0.0, 4.0, 7.07)],
     }
 }
 
 fn init_masses() -> [f64; 3] {
-    [1000.0, 1.0, 0.001]
+    [1000.0, 16.0, 0.001]
 }
 
 widget_ids! {
     pub struct Ids {
-        canvas,
-        test,
         general,
         momentum,
         energy,
+        trail_length,
         pause_play_button,
         momentum_zero,
         reset,
@@ -131,7 +128,8 @@ struct GuiState {
     general_open: bool,
     body_panel_open: [bool; 3],
     paused: bool,
-    reset: bool
+    reset: bool,
+    trail_length: usize
 }
 
 impl GuiState {
@@ -140,7 +138,8 @@ impl GuiState {
             general_open: true,
             body_panel_open: [false; 3],
             paused: false,
-            reset: false
+            reset: false,
+            trail_length: 500
         }
     }
 }
@@ -202,6 +201,18 @@ fn gui(
             .w(WIDTH)
             .parent(area.id)
             .set(ids.energy, ui);
+
+        for len in widget::NumberDialer::new(state.trail_length as f64, 0.0, 9999.0, 0)
+            .parent(area.id)
+            .label("trail length")
+            .border(0.0)
+            .align_left()
+            .h(30.0)
+            .label_font_size(12)
+            .set(ids.trail_length, ui)
+        {
+            state.trail_length = len as usize;
+        }
 
         if widget::Button::new()
             .parent(area.id)
