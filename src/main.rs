@@ -43,13 +43,8 @@ fn main() {
     ids.body_panel.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
     window.conrod_ui_mut().theme = theme();
 
-    let mut state = State {
-        x: [Vector3::new(0.0, 0.0, 0.0), Vector3::new(20.0, 0.0, 0.0), Vector3::new(20.0, 0.0, 1.0)],
-        v: [Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(0.0, 0.0, 7.07),
-            Vector3::new(1.0, 0.0, 7.07)],
-    };
-    let mut masses = [1000.0, 1.0, 0.001];
+    let mut state = init_state();
+    let mut masses = init_masses();
 
     let mut gui_state = GuiState::new();
 
@@ -82,7 +77,29 @@ fn main() {
             state.step(0.01, &masses);
         }
         gui(&mut window.conrod_ui_mut().set_widgets(), &ids, &mut masses, &mut gui_state, &mut state);
+        if gui_state.reset {
+            state = init_state();
+            masses = init_masses();
+            for i in 0..3 {
+                trails[i].clear();
+            }
+        }
     }
+}
+
+fn init_state() -> State {
+    State {
+        x: [Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(20.0, 0.0, 0.0),
+            Vector3::new(20.0, 0.0, 1.0)],
+        v: [Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 7.07),
+            Vector3::new(1.0, 0.0, 7.07)],
+    }
+}
+
+fn init_masses() -> [f64; 3] {
+    [1000.0, 1.0, 0.001]
 }
 
 widget_ids! {
@@ -94,6 +111,7 @@ widget_ids! {
         energy,
         pause_play_button,
         momentum_zero,
+        reset,
         body_panel[],
         mass[],
         velocity[]
@@ -112,15 +130,17 @@ fn theme() -> conrod::Theme {
 struct GuiState {
     general_open: bool,
     body_panel_open: [bool; 3],
-    paused: bool
+    paused: bool,
+    reset: bool
 }
 
 impl GuiState {
     fn new() -> GuiState {
         GuiState {
             general_open: true,
+            body_panel_open: [false; 3],
             paused: false,
-            body_panel_open: [false; 3]
+            reset: false
         }
     }
 }
@@ -186,7 +206,7 @@ fn gui(
         if widget::Button::new()
             .parent(area.id)
             .h(30.0)
-            .w(area.width / 3.0)
+            .w((area.width - 2.0 * MARGIN) / 3.0)
             .label(if state.paused { "Play" } else { "Pause" })
             .set(ids.pause_play_button, ui)
             .was_clicked()
@@ -197,7 +217,7 @@ fn gui(
         if widget::Button::new()
             .parent(area.id)
             .h(30.0)
-            .w(area.width / 3.0)
+            .w((area.width - 2.0 * MARGIN) / 3.0)
             .right(0.0)
             .y_relative(0.0)
             .label("p 0")
@@ -210,6 +230,16 @@ fn gui(
                 body_state.v[i] -= dv;
             }
         }
+
+        state.reset = widget::Button::new()
+            .parent(area.id)
+            .h(30.0)
+            .w((area.width - 2.0 * MARGIN) / 3.0)
+            .right(0.0)
+            .y_relative(0.0)
+            .label("Reset")
+            .set(ids.reset, ui)
+            .was_clicked();
     }
 
     let prev = match gen {
