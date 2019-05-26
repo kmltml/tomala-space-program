@@ -66,7 +66,7 @@ fn main() {
                 trails[i].pop_back();
             }
             let color = trail_colors[i];
-            for (i, (a, b)) in trails[i].iter().zip(trails[i].iter().skip(1)).enumerate() {
+            for (i, (a, b)) in trails[i].iter().zip(trails[i].iter().skip(1)).enumerate().rev() {
                 let l = 1.0 - (i as f32) / (gui_state.trail_length as f32);
                 window.draw_line(a, b, &(color * l));
             }
@@ -144,6 +144,8 @@ impl GuiState {
     }
 }
 
+const MARGIN: conrod::Scalar = 10.0;
+
 fn gui(
     ui: &mut conrod::UiCell,
     ids: &Ids,
@@ -153,7 +155,6 @@ fn gui(
 ) {
     use conrod::{widget, Borderable, Colorable, Labelable, Positionable, Sizeable, Widget};
 
-    const MARGIN: conrod::Scalar = 10.0;
     const WIDTH: conrod::Scalar = 200.0;
 
     let (gen, genev) = widget::CollapsibleArea::new(state.general_open, "general")
@@ -188,11 +189,9 @@ fn gui(
         for i in 0..3 {
             let v = body_state.v[i].norm();
             energy += masses[i] * v * v / 2.0;
-            for j in 0..3 {
-                if i != j {
-                    let r = (body_state.x[i] - body_state.x[j]).norm();
-                    energy -= masses[i] * masses[j] / r;
-                }
+            for j in (i + 1)..3 {
+                let r = (body_state.x[i] - body_state.x[j]).norm();
+                energy -= masses[i] * masses[j] / r;
             }
         }
 
@@ -207,6 +206,7 @@ fn gui(
             .label("trail length")
             .border(0.0)
             .align_left()
+            .w(area.width - 2.0 * MARGIN)
             .h(30.0)
             .label_font_size(12)
             .set(ids.trail_length, ui)
@@ -219,6 +219,7 @@ fn gui(
             .h(30.0)
             .w((area.width - 2.0 * MARGIN) / 3.0)
             .label(if state.paused { "Play" } else { "Pause" })
+            .label_font_size(12)
             .set(ids.pause_play_button, ui)
             .was_clicked()
         {
@@ -232,6 +233,7 @@ fn gui(
             .right(0.0)
             .y_relative(0.0)
             .label("p 0")
+            .label_font_size(12)
             .set(ids.momentum_zero, ui)
             .was_clicked()
         {
@@ -249,6 +251,7 @@ fn gui(
             .right(0.0)
             .y_relative(0.0)
             .label("Reset")
+            .label_font_size(12)
             .set(ids.reset, ui)
             .was_clicked();
     }
@@ -283,15 +286,16 @@ fn body_panel(
     }
     for area in a {
         let canvas = widget::Canvas::new()
-            .pad(10.0)
-            .h(60.0);
+            .h(60.0)
+            .pad(MARGIN);
         area.set(canvas, ui);
         for m in widget::NumberDialer::new(*mass, 0.0, 9999.0, 1)
             .parent(area.id)
             .label("mass")
             .border(0.0)
-            .align_left()
             .align_top()
+            .align_middle_x()
+            .w(area.width - 2.0 * MARGIN)
             .h(30.0)
             .label_font_size(12)
             .set(ids.mass[i], ui)
@@ -306,6 +310,7 @@ fn body_panel(
             .align_left()
             .down(0.0)
             .h(30.0)
+            .w(area.width - 2.0 * MARGIN)
             .label_font_size(12)
             .set(ids.velocity[i], ui)
         {
