@@ -13,6 +13,7 @@ use na::{Vector3, Point3};
 use kiss3d::window::Window;
 use kiss3d::light::Light;
 use kiss3d::resource::{TextureManager};
+use kiss3d::camera::ArcBall;
 use kiss3d::conrod;
 
 fn main() {
@@ -23,6 +24,8 @@ fn main() {
     let mut sky = window.add_sphere(200.0);
 
     let mut textures = TextureManager::new();
+
+    let mut camera = ArcBall::new(Point3::new(4.0, 4.0, 0.0), Point3::new(0.0, 0.0, 0.0));
 
     textures.add(Path::new("tex/earth.jpg"), "earth");
     textures.add(Path::new("tex/sun.jpg"), "sun");
@@ -41,6 +44,7 @@ fn main() {
     ids.mass.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
     ids.velocity.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
     ids.body_panel.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
+    ids.follow.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
     window.conrod_ui_mut().theme = theme();
 
     let mut state = init_state();
@@ -55,7 +59,7 @@ fn main() {
     ];
     let mut trails: [VecDeque<Point3<f32>>; 3] = [VecDeque::new(), VecDeque::new(), VecDeque::new()];
 
-    while window.render() {
+    while window.render_with_camera(&mut camera) {
         sol.set_local_translation(state.x[0].map(|x| x as f32).into());
         earth.set_local_translation(state.x[1].map(|x| x as f32).into());
         luna.set_local_translation(state.x[2].map(|x| x as f32).into());
@@ -75,6 +79,9 @@ fn main() {
             state.step(0.01, &masses);
         }
         gui(&mut window.conrod_ui_mut().set_widgets(), &ids, &mut masses, &mut gui_state, &mut state);
+        if let Some(i) = gui_state.follow {
+            camera.set_at(state.x[i].map(|x| x as f32).into());
+        }
         if gui_state.reset {
             state = init_state();
             masses = init_masses();
@@ -111,7 +118,8 @@ widget_ids! {
         reset,
         body_panel[],
         mass[],
-        velocity[]
+        velocity[],
+        follow[]
     }
 }
 
@@ -129,7 +137,8 @@ struct GuiState {
     body_panel_open: [bool; 3],
     paused: bool,
     reset: bool,
-    trail_length: usize
+    trail_length: usize,
+    follow: Option<usize>
 }
 
 impl GuiState {
@@ -139,7 +148,8 @@ impl GuiState {
             body_panel_open: [false; 3],
             paused: false,
             reset: false,
-            trail_length: 500
+            trail_length: 500,
+            follow: None
         }
     }
 }
@@ -286,7 +296,7 @@ fn body_panel(
     }
     for area in a {
         let canvas = widget::Canvas::new()
-            .h(60.0)
+            .h(90.0)
             .pad(MARGIN);
         area.set(canvas, ui);
         for m in widget::NumberDialer::new(*mass, 0.0, 9999.0, 1)
@@ -315,6 +325,18 @@ fn body_panel(
             .set(ids.velocity[i], ui)
         {
             body_state.v[i] = body_state.v[i].normalize() * nv;
+        }
+        for s in widget::Toggle::new(state.follow == Some(i))
+            .parent(area.id)
+            .label("follow")
+            .align_left()
+            .down(0.0)
+            .h(30.0)
+            .w(area.width - 2.0 * MARGIN)
+            .label_font_size(12)
+            .set(ids.follow[i], ui)
+        {
+            state.follow = if s { Some(i) } else { None };
         }
     }
     match a {
