@@ -66,7 +66,7 @@ fn main() {
         window.set_light(Light::Absolute(state.x[0].map(|x| x as f32).into()));
         for i in 0..3 {
             trails[i].push_front(state.x[i].map(|x| x as f32).into());
-            if(trails[i].len() > gui_state.trail_length) {
+            if trails[i].len() > gui_state.trail_length {
                 trails[i].pop_back();
             }
             let color = trail_colors[i];
@@ -85,6 +85,8 @@ fn main() {
         if gui_state.reset {
             state = init_state();
             masses = init_masses();
+        }
+        if gui_state.reset || gui_state.clear_trails {
             for i in 0..3 {
                 trails[i].clear();
             }
@@ -116,6 +118,7 @@ widget_ids! {
         pause_play_button,
         momentum_zero,
         reset,
+        clear_trails,
         body_panel[],
         mass[],
         velocity[],
@@ -137,6 +140,7 @@ struct GuiState {
     body_panel_open: [bool; 3],
     paused: bool,
     reset: bool,
+    clear_trails: bool,
     trail_length: usize,
     follow: Option<usize>
 }
@@ -148,6 +152,7 @@ impl GuiState {
             body_panel_open: [false; 3],
             paused: false,
             reset: false,
+            clear_trails: false,
             trail_length: 500,
             follow: None
         }
@@ -163,7 +168,7 @@ fn gui(
     state: &mut GuiState,
     body_state: &mut State
 ) {
-    use conrod::{widget, Borderable, Colorable, Labelable, Positionable, Sizeable, Widget};
+    use conrod::{widget, Borderable, Labelable, Positionable, Sizeable, Widget};
 
     const WIDTH: conrod::Scalar = 200.0;
 
@@ -178,7 +183,7 @@ fn gui(
     }
     for area in gen {
         let canvas = widget::Canvas::new()
-            .h(200.0)
+            .h(240.0)
             .pad(MARGIN);
 
         area.set(canvas, ui);
@@ -264,6 +269,17 @@ fn gui(
             .label_font_size(12)
             .set(ids.reset, ui)
             .was_clicked();
+
+        state.clear_trails = widget::Button::new()
+            .parent(area.id)
+            .h(30.0)
+            .w((area.width - 2.0 * MARGIN) / 3.0)
+            .down(0.0)
+            .align_left_of(ids.pause_play_button)
+            .label("Clear\ntrails")
+            .label_font_size(12)
+            .set(ids.clear_trails, ui)
+            .was_clicked()
     }
 
     let prev = match gen {
@@ -285,7 +301,7 @@ fn body_panel(
     ui: &mut conrod::UiCell,
     ids: &Ids
 ) -> conrod::widget::Id {
-    use conrod::{widget, Borderable, Colorable, Labelable, Positionable, Sizeable, Widget};
+    use conrod::{widget, Borderable, Labelable, Positionable, Sizeable, Widget};
     const WIDTH: conrod::Scalar = 200.0;
     let (a, e) = widget::CollapsibleArea::new(state.body_panel_open[i], title)
         .w_h(WIDTH, 20.0)
