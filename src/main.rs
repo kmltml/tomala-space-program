@@ -13,6 +13,7 @@ use std::collections::vec_deque::VecDeque;
 
 use na::{Vector3, Point3};
 use kiss3d::window::Window;
+use kiss3d::event::{Key, WindowEvent, Action};
 use kiss3d::light::Light;
 use kiss3d::resource::{TextureManager};
 use kiss3d::camera::ArcBall;
@@ -82,6 +83,15 @@ fn main() {
             }
         }
         gui(&mut window.conrod_ui_mut().set_widgets(), &ids, &mut masses, &mut gui_state, &mut state, &presets);
+
+        for e in window.events().iter() {
+            match e.value {
+                WindowEvent::Key(Key::Space, Action::Press, _) =>
+                    gui_state.paused = !gui_state.paused,
+                _ => ()
+            }
+        }
+
         if let Some(i) = gui_state.follow {
             camera.set_at(state.x[i].map(|x| x as f32).into());
         }
