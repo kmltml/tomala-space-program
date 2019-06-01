@@ -3,8 +3,10 @@ extern crate kiss3d;
 extern crate nalgebra as na;
 
 mod solver;
+mod presets;
 
 use solver::State;
+use presets::Preset;
 
 use std::path::Path;
 use std::collections::vec_deque::VecDeque;
@@ -27,6 +29,8 @@ fn main() {
 
     let mut camera = ArcBall::new(Point3::new(4.0, 4.0, 0.0), Point3::new(0.0, 0.0, 0.0));
 
+    let presets = Preset::default_presets();
+
     textures.add(Path::new("tex/earth.jpg"), "earth");
     textures.add(Path::new("tex/sun.jpg"), "sun");
     textures.add(Path::new("tex/moon.jpg"), "moon");
@@ -47,8 +51,8 @@ fn main() {
     ids.follow.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
     window.conrod_ui_mut().theme = theme();
 
-    let mut state = init_state();
-    let mut masses = init_masses();
+    let mut state = presets[0].state();
+    let mut masses = presets[0].masses();
 
     let mut gui_state = GuiState::new();
 
@@ -78,15 +82,19 @@ fn main() {
         if !gui_state.paused {
             state.step(0.01, &masses);
         }
-        gui(&mut window.conrod_ui_mut().set_widgets(), &ids, &mut masses, &mut gui_state, &mut state);
+        gui(&mut window.conrod_ui_mut().set_widgets(), &ids, &mut masses, &mut gui_state, &mut state, &presets);
         if let Some(i) = gui_state.follow {
             camera.set_at(state.x[i].map(|x| x as f32).into());
         }
-        if gui_state.reset {
-            state = init_state();
-            masses = init_masses();
+        if gui_state.reset || gui_state.preset_changed {
+            let preset = &presets[gui_state.selected_preset];
+            state = preset.state();
+            masses = preset.masses();
+            for i in 0..3 {
+
+            }
         }
-        if gui_state.reset || gui_state.clear_trails {
+        if gui_state.reset || gui_state.clear_trails || gui_state.preset_changed {
             for i in 0..3 {
                 trails[i].clear();
             }
@@ -94,26 +102,12 @@ fn main() {
     }
 }
 
-fn init_state() -> State {
-    State {
-        x: [Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(20.0, 0.0, 0.0),
-            Vector3::new(20.0, 0.0, 1.0)],
-        v: [Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(0.0, 0.0, 7.07),
-            Vector3::new(0.0, 4.0, 7.07)],
-    }
-}
-
-fn init_masses() -> [f64; 3] {
-    [1000.0, 16.0, 0.001]
-}
-
 widget_ids! {
     pub struct Ids {
         general,
         momentum,
         energy,
+        preset,
         trail_length,
         pause_play_button,
         momentum_zero,
@@ -138,6 +132,8 @@ fn theme() -> conrod::Theme {
 struct GuiState {
     general_open: bool,
     body_panel_open: [bool; 3],
+    selected_preset: usize,
+    preset_changed: bool,
     paused: bool,
     reset: bool,
     clear_trails: bool,
@@ -150,6 +146,8 @@ impl GuiState {
         GuiState {
             general_open: true,
             body_panel_open: [false; 3],
+            selected_preset: 0,
+            preset_changed: true,
             paused: false,
             reset: false,
             clear_trails: false,
@@ -166,7 +164,8 @@ fn gui(
     ids: &Ids,
     masses: &mut [f64; 3],
     state: &mut GuiState,
-    body_state: &mut State
+    body_state: &mut State,
+    presets: &Vec<Preset>
 ) {
     use conrod::{widget, Borderable, Labelable, Positionable, Sizeable, Widget};
 
@@ -192,6 +191,7 @@ fn gui(
         for i in 0..3 {
             momentum += body_state.v[i] * masses[i];
         }
+
         widget::Text::new(&*format!("Total momentum:\n x: {:.2}\n y: {:.2}\n z: {:.2}",
                                     momentum.x, momentum.y, momentum.z))
             .font_size(12)
@@ -215,6 +215,21 @@ fn gui(
             .w(WIDTH)
             .parent(area.id)
             .set(ids.energy, ui);
+
+        state.preset_changed = false;
+
+        let preset_names: Vec<&str> = presets.iter().map(|p| p.name).collect();
+        for i in widget::DropDownList::new(&preset_names, Some(state.selected_preset))
+            .parent(area.id)
+            .align_left()
+            .w(area.width - 2.0 * MARGIN)
+            .h(30.0)
+            .label_font_size(12)
+            .set(ids.preset, ui)
+        {
+            state.selected_preset = i;
+            state.preset_changed = true;
+        }
 
         for len in widget::NumberDialer::new(state.trail_length as f64, 0.0, 9999.0, 0)
             .parent(area.id)
