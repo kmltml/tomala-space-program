@@ -77,8 +77,8 @@ fn main() {
             }
         }
         if !gui_state.paused {
-            for _ in 0..gui_state.simulation_speed {
-                state.step(0.001, &masses);
+            for _ in 0..gui_state.simulation_speed * gui_state.substeps {
+                state.step(0.001 / gui_state.substeps as f64, &masses);
             }
         }
         gui(&mut window.conrod_ui_mut().set_widgets(), &ids, &mut masses, &mut gui_state, &mut state, &presets);
@@ -111,6 +111,7 @@ widget_ids! {
         energy,
         preset,
         speed,
+        substeps,
         trail_length,
         pause_play_button,
         momentum_zero,
@@ -142,6 +143,7 @@ struct GuiState {
     clear_trails: bool,
     trail_length: usize,
     simulation_speed: usize,
+    substeps: usize,
     follow: Option<usize>
 }
 
@@ -157,6 +159,7 @@ impl GuiState {
             clear_trails: false,
             trail_length: 500,
             simulation_speed: 10,
+            substeps: 10,
             follow: None
         }
     }
@@ -189,7 +192,7 @@ fn gui(
     }
     for area in gen {
         let canvas = widget::Canvas::new()
-            .h(280.0)
+            .h(370.0)
             .pad(MARGIN);
 
         area.set(canvas, ui);
@@ -239,6 +242,7 @@ fn gui(
         }
 
         for s in widget::Slider::new(state.simulation_speed as f64, 1.0, 100.0)
+            .skew(2.0)
             .parent(area.id)
             .align_left()
             .w(area.width - 2.0 * MARGIN)
@@ -249,6 +253,21 @@ fn gui(
         {
             state.simulation_speed = s as usize;
         }
+
+        for s in widget::Slider::new(state.substeps as f64, 1.0, 1000.0)
+            .skew(2.0)
+            .parent(area.id)
+            .align_left()
+            .down(0.0)
+            .w(area.width - 2.0 * MARGIN)
+            .h(30.0)
+            .label(&format!("substeps: {}", state.substeps))
+            .label_font_size(12)
+            .set(ids.substeps, ui)
+        {
+            state.substeps = s as usize;
+        }
+
 
 
         for len in widget::NumberDialer::new(state.trail_length as f64, 0.0, 9999.0, 0)
