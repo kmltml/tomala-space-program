@@ -58,11 +58,6 @@ fn main() {
 
     let mut gui_state = GuiState::new();
 
-    let trail_colors: [Point3<f32>; 3] = [
-        Point3::new(0.92, 0.80, 0.49),
-        Point3::new(0.49, 0.72, 0.92),
-        Point3::new(0.94, 0.94, 0.94)
-    ];
     let mut trails: [VecDeque<Point3<f32>>; 3] = [VecDeque::new(), VecDeque::new(), VecDeque::new()];
 
     while window.render_with_camera(&mut camera) {
@@ -82,7 +77,9 @@ fn main() {
             }
         }
         if !gui_state.paused {
-            state.step(0.01, &masses);
+            for _ in 0..gui_state.simulation_speed {
+                state.step(0.001, &masses);
+            }
         }
         gui(&mut window.conrod_ui_mut().set_widgets(), &ids, &mut masses, &mut gui_state, &mut state, &presets);
         if let Some(i) = gui_state.follow {
@@ -113,6 +110,7 @@ widget_ids! {
         momentum,
         energy,
         preset,
+        speed,
         trail_length,
         pause_play_button,
         momentum_zero,
@@ -143,6 +141,7 @@ struct GuiState {
     reset: bool,
     clear_trails: bool,
     trail_length: usize,
+    simulation_speed: usize,
     follow: Option<usize>
 }
 
@@ -157,6 +156,7 @@ impl GuiState {
             reset: false,
             clear_trails: false,
             trail_length: 500,
+            simulation_speed: 10,
             follow: None
         }
     }
@@ -237,6 +237,19 @@ fn gui(
             state.selected_preset = i;
             state.preset_changed = true;
         }
+
+        for s in widget::Slider::new(state.simulation_speed as f64, 1.0, 100.0)
+            .parent(area.id)
+            .align_left()
+            .w(area.width - 2.0 * MARGIN)
+            .h(30.0)
+            .label(&format!("speed: {}", state.simulation_speed))
+            .label_font_size(12)
+            .set(ids.speed, ui)
+        {
+            state.simulation_speed = s as usize;
+        }
+
 
         for len in widget::NumberDialer::new(state.trail_length as f64, 0.0, 9999.0, 0)
             .parent(area.id)
