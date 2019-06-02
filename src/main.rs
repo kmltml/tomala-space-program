@@ -11,12 +11,12 @@ use presets::Preset;
 use std::path::Path;
 use std::collections::vec_deque::VecDeque;
 
-use na::{Vector3, Point3};
+use na::{Vector3, Point3, Rotation3};
 use kiss3d::window::Window;
 use kiss3d::event::{Key, WindowEvent, Action};
 use kiss3d::light::Light;
 use kiss3d::resource::{TextureManager};
-use kiss3d::camera::ArcBall;
+use kiss3d::camera::{ArcBall, Camera};
 use kiss3d::conrod;
 
 fn main() {
@@ -46,6 +46,8 @@ fn main() {
     ids.velocity.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
     ids.body_panel.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
     ids.follow.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
+    ids.fix.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
+    ids.fix_rot.resize(3, &mut window.conrod_ui_mut().widget_id_generator());
     window.conrod_ui_mut().theme = theme();
 
     let mut state = presets[0].state();
@@ -92,9 +94,27 @@ fn main() {
             }
         }
 
-        if let Some(i) = gui_state.follow {
-            camera.set_at(state.x[i].map(|x| x as f32).into());
+        match gui_state.follow {
+            FollowState::Follow(f) =>
+                camera.set_at(state.x[f].map(|x| x as f32).into()),
+            FollowState::Fix(f, rot) => {
+                let pos = state.x[f];
+                for i in 0..3 {
+                    state.x[i] -= pos;
+                }
+                for r in rot {
+                    if let Some(trans) = Rotation3::rotation_between(&state.x[r], &Vector3::new(1.0, 0.0, 0.0)) {
+                        for i in 0..3 {
+                            state.x[i] = trans * state.x[i];
+                            state.v[i] = trans * state.v[i];
+                        }
+                    }
+                }
+            },
+            FollowState::None => {}
         }
+
+        sky.set_local_translation(camera.eye().coords.into());
         if gui_state.reset || gui_state.preset_changed {
             let preset = &presets[gui_state.selected_preset];
             state = preset.state();
@@ -105,6 +125,7 @@ fn main() {
                 body_spheres[i].set_color(body_data.color[0], body_data.color[1], body_data.color[2]);
                 body_spheres[i].set_local_scale(body_data.radius, body_data.radius, body_data.radius);
             }
+            gui_state.follow = FollowState::None;
         }
         if gui_state.reset || gui_state.clear_trails || gui_state.preset_changed {
             for i in 0..3 {
@@ -130,7 +151,9 @@ widget_ids! {
         body_panel[],
         mass[],
         velocity[],
-        follow[]
+        follow[],
+        fix[],
+        fix_rot[]
     }
 }
 
@@ -154,7 +177,7 @@ struct GuiState {
     trail_length: usize,
     simulation_speed: usize,
     substeps: usize,
-    follow: Option<usize>
+    follow: FollowState
 }
 
 impl GuiState {
@@ -170,9 +193,34 @@ impl GuiState {
             trail_length: 500,
             simulation_speed: 10,
             substeps: 10,
-            follow: None
+            follow: FollowState::None
         }
     }
+}
+
+#[derive(PartialEq, Debug)]
+enum FollowState {
+    Follow(usize),
+    Fix(usize, Option<usize>),
+    None
+}
+
+impl FollowState {
+
+    fn fix_center(&self) -> Option<usize> {
+        match *self {
+            FollowState::Fix(f, _) => Some(f),
+            _ => None
+        }
+    }
+
+    fn fix_rot(&self) -> Option<usize> {
+        match *self {
+            FollowState::Fix(_, f) => f,
+            _ => None
+        }
+    }
+
 }
 
 const MARGIN: conrod::Scalar = 10.0;
@@ -406,17 +454,46 @@ fn body_panel(
         {
             body_state.v[i] = body_state.v[i].normalize() * nv;
         }
-        for s in widget::Toggle::new(state.follow == Some(i))
+        for s in widget::Toggle::new(state.follow == FollowState::Follow(i))
             .parent(area.id)
             .label("follow")
             .align_left()
             .down(0.0)
             .h(30.0)
-            .w(area.width - 2.0 * MARGIN)
+            .w((area.width - 2.0 * MARGIN) / 3.0)
             .label_font_size(12)
             .set(ids.follow[i], ui)
         {
-            state.follow = if s { Some(i) } else { None };
+            state.follow = if s { FollowState::Follow(i) } else { FollowState::None };
+        }
+        for s in widget::Toggle::new(state.follow.fix_center() == Some(i))
+            .parent(area.id)
+            .label("fix")
+            .right(0.0)
+            .y_relative(0.0)
+            .h(30.0)
+            .w((area.width - 2.0 * MARGIN) / 3.0)
+            .label_font_size(12)
+            .set(ids.fix[i], ui)
+        {
+            state.follow = if s { FollowState::Fix(i, None) } else { FollowState::None };
+        }
+        for s in widget::Toggle::new(state.follow.fix_rot() == Some(i))
+            .parent(area.id)
+            .label("fix rot")
+            .enabled(state.follow.fix_center() != None && state.follow.fix_center() != Some(i))
+            .right(0.0)
+            .y_relative(0.0)
+            .h(30.0)
+            .w((area.width - 2.0 * MARGIN) / 3.0)
+            .label_font_size(12)
+            .set(ids.fix_rot[i], ui)
+        {
+            state.follow = if s {
+                FollowState::Fix(state.follow.fix_center().unwrap(), Some(i))
+            } else {
+                FollowState::Fix(state.follow.fix_center().unwrap(), None)
+            };
         }
     }
     match a {
