@@ -23,7 +23,8 @@ impl Preset {
         vec!(
             sun_earth_moon(),
             three_stars(),
-            figure_eight()
+            figure_eight(),
+            lagrange_4()
         )
     }
 
@@ -172,6 +173,48 @@ fn figure_eight() -> Preset {
                 mass: m,
                 x: Vector3::zeros(),
                 v: v3
+            }
+        ]
+    }
+}
+
+fn lagrange_4() -> Preset {
+    let r: f64 = 20.0;
+    let m1 = 1000.0;
+    let m2 = 10.0;
+    let v = (m1 / r).sqrt();
+    Preset {
+        name: "L4",
+        bodies: [
+            BodyData {
+                name: "Sol",
+                texture: "sun",
+                color: [5.0, 5.0, 5.0],
+                trail_color: Point3::new(0.92, 0.80, 0.49),
+                radius: 2.0,
+                mass: 1000.0,
+                x: Vector3::new(0.0, 0.0, 0.0),
+                v: Vector3::new(0.0, 0.0, 0.0)
+            },
+            BodyData {
+                name: "Earth",
+                texture: "earth",
+                color: [1.0, 1.0, 1.0],
+                trail_color: Point3::new(0.49, 0.72, 0.92),
+                radius: 0.5,
+                mass: m2,
+                x: Vector3::new(r, 0.0, 0.0),
+                v: Vector3::new(0.0, 0.0, v)
+            },
+            BodyData {
+                name: "Trojan",
+                texture: "moon",
+                color: [1.0, 1.0, 1.0],
+                trail_color: Point3::new(0.94, 0.94, 0.94),
+                radius: 0.25,
+                mass: 0.1,
+                x: Vector3::new(r / 2.0, 0.0, r * 3.0f64.sqrt() / 2.0),
+                v: Vector3::new(-v * 3.0f64.sqrt() / 2.0, 0.0, v / 2.0)
             }
         ]
     }
