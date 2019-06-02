@@ -94,24 +94,23 @@ fn main() {
             }
         }
 
-        match gui_state.follow {
-            FollowState::Follow(f) =>
-                camera.set_at(state.x[f].map(|x| x as f32).into()),
-            FollowState::Fix(f, rot) => {
-                let pos = state.x[f];
-                for i in 0..3 {
-                    state.x[i] -= pos;
-                }
-                for r in rot {
-                    if let Some(trans) = Rotation3::rotation_between(&state.x[r], &Vector3::new(1.0, 0.0, 0.0)) {
-                        for i in 0..3 {
-                            state.x[i] = trans * state.x[i];
-                            state.v[i] = trans * state.v[i];
-                        }
+        if let Some(f) = gui_state.follow {
+            camera.set_at(state.x[f].map(|x| x as f32).into());
+        }
+
+        if let FixState::Fix(f, rot) = gui_state.fix {
+            let pos = state.x[f];
+            for i in 0..3 {
+                state.x[i] -= pos;
+            }
+            for r in rot {
+                if let Some(trans) = Rotation3::rotation_between(&state.x[r], &Vector3::new(1.0, 0.0, 0.0)) {
+                    for i in 0..3 {
+                        state.x[i] = trans * state.x[i];
+                        state.v[i] = trans * state.v[i];
                     }
                 }
-            },
-            FollowState::None => {}
+            }
         }
 
         sky.set_local_translation(camera.eye().coords.into());
@@ -125,7 +124,8 @@ fn main() {
                 body_spheres[i].set_color(body_data.color[0], body_data.color[1], body_data.color[2]);
                 body_spheres[i].set_local_scale(body_data.radius, body_data.radius, body_data.radius);
             }
-            gui_state.follow = FollowState::None;
+            gui_state.follow = None;
+            gui_state.fix = FixState::None;
         }
         if gui_state.reset || gui_state.clear_trails || gui_state.preset_changed {
             for i in 0..3 {
@@ -177,7 +177,8 @@ struct GuiState {
     trail_length: usize,
     simulation_speed: usize,
     substeps: usize,
-    follow: FollowState
+    follow: Option<usize>,
+    fix: FixState
 }
 
 impl GuiState {
@@ -193,30 +194,30 @@ impl GuiState {
             trail_length: 500,
             simulation_speed: 10,
             substeps: 10,
-            follow: FollowState::None
+            follow: None,
+            fix: FixState::None
         }
     }
 }
 
 #[derive(PartialEq, Debug)]
-enum FollowState {
-    Follow(usize),
+enum FixState {
     Fix(usize, Option<usize>),
     None
 }
 
-impl FollowState {
+impl FixState {
 
     fn fix_center(&self) -> Option<usize> {
         match *self {
-            FollowState::Fix(f, _) => Some(f),
+            FixState::Fix(f, _) => Some(f),
             _ => None
         }
     }
 
     fn fix_rot(&self) -> Option<usize> {
         match *self {
-            FollowState::Fix(_, f) => f,
+            FixState::Fix(_, f) => f,
             _ => None
         }
     }
@@ -454,7 +455,7 @@ fn body_panel(
         {
             body_state.v[i] = body_state.v[i].normalize() * nv;
         }
-        for s in widget::Toggle::new(state.follow == FollowState::Follow(i))
+        for s in widget::Toggle::new(state.follow == Some(i))
             .parent(area.id)
             .label("follow")
             .align_left()
@@ -464,9 +465,9 @@ fn body_panel(
             .label_font_size(12)
             .set(ids.follow[i], ui)
         {
-            state.follow = if s { FollowState::Follow(i) } else { FollowState::None };
+            state.follow = if s { Some(i) } else { None };
         }
-        for s in widget::Toggle::new(state.follow.fix_center() == Some(i))
+        for s in widget::Toggle::new(state.fix.fix_center() == Some(i))
             .parent(area.id)
             .label("fix")
             .right(0.0)
@@ -476,12 +477,12 @@ fn body_panel(
             .label_font_size(12)
             .set(ids.fix[i], ui)
         {
-            state.follow = if s { FollowState::Fix(i, None) } else { FollowState::None };
+            state.fix = if s { FixState::Fix(i, None) } else { FixState::None };
         }
-        for s in widget::Toggle::new(state.follow.fix_rot() == Some(i))
+        for s in widget::Toggle::new(state.fix.fix_rot() == Some(i))
             .parent(area.id)
             .label("fix rot")
-            .enabled(state.follow.fix_center() != None && state.follow.fix_center() != Some(i))
+            .enabled(state.fix.fix_center() != None && state.fix.fix_center() != Some(i))
             .right(0.0)
             .y_relative(0.0)
             .h(30.0)
@@ -489,10 +490,10 @@ fn body_panel(
             .label_font_size(12)
             .set(ids.fix_rot[i], ui)
         {
-            state.follow = if s {
-                FollowState::Fix(state.follow.fix_center().unwrap(), Some(i))
+            state.fix = if s {
+                FixState::Fix(state.fix.fix_center().unwrap(), Some(i))
             } else {
-                FollowState::Fix(state.follow.fix_center().unwrap(), None)
+                FixState::Fix(state.fix.fix_center().unwrap(), None)
             };
         }
     }
